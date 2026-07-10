@@ -114,21 +114,13 @@ SUPABASE_KEY="YOUR_SUPABASE_ANON_KEY"
 > **Note:** API keys are excluded from this repository using `.gitignore`.
 ---
 # 📸 Workflow
-1. Teacher registers and logs in.
-2. Student opens the Student Portal.
-3. Camera captures the student's face.
-4. AI extracts face embeddings.
-5. Face is matched with registered students.
-6. Attendance is automatically recorded.
-7. New students can register with face and optional voice enrollment.
 
----
-# 📌 Upcoming Features
-
-- 📊 Attendance Dashboard
-- 📅 Attendance History
-- 📈 Analytics & Reports
-- 🏫 Multiple Classroom Support
-- 🔐 Enhanced Voice Authentication
-- 📥 Export Attendance to Excel/PDF
+1. Teacher registers and securely logs into the system.
+2. Student selects the Student Portal.
+3. Student captures a live photo using the webcam.
+4. AI detects the face and generates a 128-dimensional face embedding.
+5. The embedding is matched against registered student embeddings using an SVM classifier.
+6. If a match is found, the student is authenticated and attendance is marked automatically.
+7. If no match is found, the student registers by providing their name, face image, and optionally a voice sample.
+8. The new student's embeddings are stored in Supabase, and the recognition model is retrained for future logins.
 

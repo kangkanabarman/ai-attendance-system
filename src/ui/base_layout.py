@@ -40,9 +40,9 @@ def style_base_layout():
         @import url('https://fonts.googleapis.com/css2?family=Climate+Crisis:YEAR@1979&family=Outfit:wght@100..900&display=swap');
             /* Hide top toolbar of streamlit */
                 
-                #MainMenu, footer, header{
-                    visibility: hidden;
-                }
+                # #MainMenu, footer, header{
+                #     visibility: hidden;
+                # }
 
                 .block-container{
                     padding-top:1.5rem !important;
@@ -67,32 +67,39 @@ def style_base_layout():
                     font-family: 'Outfit', sans-serif;
                 }
 
-                button{
+                /* ===========================
+                ALL BUTTONS
+                =========================== */
+
+                .stButton > button {
                     border-radius: 1.5rem !important;
-                    background: #5865F2 !important;
-                    color: white !important;
                     padding: 10px 20px !important;
                     border: none !important;
-                    transition: transform 0.25s ease-in-out !important;
-                }
-                button[kind="secondary"]{
-                    border-radius: 1.5rem !important;
-                    background: #EB459E !important;
                     color: white !important;
-                    padding: 10px 20px !important;
-                    border: none !important;
-                    transition: transform 0.25s ease-in-out !important;
+                    transition: all 0.25s ease !important;
                 }
-                button[kind="tertiary"]{
-                    border-radius: 1.5rem !important;
-                    background: black !important;
+
+                /* Primary Button (Blue) */
+                .stButton > button[data-testid="stBaseButton-primary"] {
+                    background-color: #5865F2 !important;
                     color: white !important;
-                    padding: 10px 20px !important;
-                    border: none !important;
-                    transition: transform 0.25s ease-in-out !important;
                 }
-                button:hover{
-                    transform:scale(1.05);
+
+                /* Secondary Button (Pink) */
+                .stButton > button[data-testid="stBaseButton-secondary"] {
+                    background-color: #EB459E !important;
+                    color: white !important;
+                }
+
+                /* Tertiary Button (Black) */
+                .stButton > button[data-testid="stBaseButton-tertiary"] {
+                    background-color: #000000 !important;
+                    color: white !important;
+                }
+
+                /* Hover */
+                .stButton > button:hover {
+                    transform: scale(1.05);
                 }
 
         <style>

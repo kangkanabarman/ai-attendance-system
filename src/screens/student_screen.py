@@ -54,7 +54,8 @@ def student_dashboard():
             if sid not in stats_map:
                 stats_map[sid] = {"total": 0, "attended": 0}
             stats_map[sid]["total"] += 1
-            if log.get('is_present'):
+            is_p = log.get('is_present') in (True, 1, 'true', 'True', 't')
+            if is_p:
                 stats_map[sid]["attended"] += 1
 
     if subjects:
@@ -64,7 +65,7 @@ def student_dashboard():
             sid = sub['subject_id']
 
             stats = stats_map.get(sid, {"total": 0, "attended": 0})
-            pct = round((stats['attended'] / stats['total'] * 100)) if stats['total'] > 0 else 0
+            pct = round((stats['attended'] / stats['total'] * 100), 1) if stats['total'] > 0 else 0.0
 
             def make_unenroll_btn(subject_id_val=sid, subject_name=sub['name']):
                 def unenroll_button():

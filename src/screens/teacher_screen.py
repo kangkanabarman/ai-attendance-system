@@ -91,6 +91,15 @@ def teacher_dashboard():
         teacher_tab_attendance_records()
 
 
+def get_current_time_ist():
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.datetime.now(ZoneInfo("Asia/Kolkata"))
+    except Exception:
+        tz_ist = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+        return datetime.datetime.now(tz_ist)
+
+
 # ==========================================
 # TAB 1: TAKE AI ATTENDANCE
 # ==========================================
@@ -137,12 +146,13 @@ def teacher_tab_take_attendance():
     detected_student_ids = set()
     ai_status_map = {}
 
-    # Session Date and Time
+    # Session Date and Time (Defaulted to Indian Standard Time)
+    now_ist = get_current_time_ist()
     c_date, c_time = st.columns(2)
     with c_date:
-        session_date = st.date_input("Class Date", value=datetime.date.today())
+        session_date = st.date_input("Class Date", value=now_ist.date())
     with c_time:
-        session_time = st.time_input("Class Time", value=datetime.datetime.now().time())
+        session_time = st.time_input("Class Time", value=now_ist.time().replace(microsecond=0))
 
     session_timestamp = f"{session_date} {session_time.strftime('%H:%M:%S')}"
 
@@ -222,34 +232,41 @@ def teacher_tab_take_attendance():
     st.divider()
 
     # --- Step 4: Interactive Student Checklist ---
-    st.subheader("📋 Attendance Roster & Manual Verification")
+    st.subheader("📋 Attendance Roster & Verification")
     st.caption("Review and edit the attendance list before saving.")
+
+    # Initialize session state for subject checkboxes if not initialized or subject switched
+    if "current_att_subject" not in st.session_state or st.session_state.current_att_subject != subject_id:
+        st.session_state.current_att_subject = subject_id
+        st.session_state.ai_status_map = {}
+        for s in enrolled_students:
+            st.session_state[f"att_check_{s['student_id']}_{subject_id}"] = False
+
+    # If AI detected students in this run, automatically check their box in session state
+    if detected_student_ids:
+        if "ai_status_map" not in st.session_state:
+            st.session_state.ai_status_map = {}
+        st.session_state.ai_status_map.update(ai_status_map)
+        for sid in detected_student_ids:
+            st.session_state[f"att_check_{sid}_{subject_id}"] = True
 
     # Action buttons
     b1, b2, b3 = st.columns(3)
-    if "attendance_state" not in st.session_state or st.session_state.get("attendance_subject_id") != subject_id:
-        st.session_state.attendance_subject_id = subject_id
-        st.session_state.attendance_state = {s['student_id']: (s['student_id'] in detected_student_ids) for s in enrolled_students}
-
-    # If new detections arrived, update state
-    for sid in detected_student_ids:
-        if sid in st.session_state.attendance_state:
-            st.session_state.attendance_state[sid] = True
-
     with b1:
         if st.button("Mark All Present", type="primary", use_container_width=True):
             for s in enrolled_students:
-                st.session_state.attendance_state[s['student_id']] = True
+                st.session_state[f"att_check_{s['student_id']}_{subject_id}"] = True
             st.rerun()
     with b2:
         if st.button("Mark All Absent", type="secondary", use_container_width=True):
             for s in enrolled_students:
-                st.session_state.attendance_state[s['student_id']] = False
+                st.session_state[f"att_check_{s['student_id']}_{subject_id}"] = False
             st.rerun()
     with b3:
         if st.button("Invert Selection", type="tertiary", use_container_width=True):
             for s in enrolled_students:
-                st.session_state.attendance_state[s['student_id']] = not st.session_state.attendance_state.get(s['student_id'], False)
+                chk_key = f"att_check_{s['student_id']}_{subject_id}"
+                st.session_state[chk_key] = not st.session_state.get(chk_key, False)
             st.rerun()
 
     # Display Students Roster
@@ -259,17 +276,19 @@ def teacher_tab_take_attendance():
     for s in enrolled_students:
         sid = s['student_id']
         name = s['name']
-        status_tag = ai_status_map.get(sid, "Manual")
+        chk_key = f"att_check_{sid}_{subject_id}"
+        if chk_key not in st.session_state:
+            st.session_state[chk_key] = False
+
+        status_tag = st.session_state.get("ai_status_map", {}).get(sid, "Manual")
         
         c_chk, c_nm, c_st = st.columns([1, 4, 3], vertical_alignment='center')
         with c_chk:
             checked = st.checkbox(
                 "Present",
-                value=st.session_state.attendance_state.get(sid, False),
-                key=f"att_check_{sid}_{subject_id}",
+                key=chk_key,
                 label_visibility="collapsed"
             )
-            st.session_state.attendance_state[sid] = checked
             if checked:
                 present_count += 1
                 
@@ -279,7 +298,7 @@ def teacher_tab_take_attendance():
             if status_tag != "Manual":
                 st.badge(status_tag) if hasattr(st, 'badge') else st.markdown(f"`{status_tag}`")
             else:
-                st.caption("Not detected by AI")
+                st.caption("Manual / Absent")
 
     st.write("")
     total_enrolled = len(enrolled_students)
@@ -296,7 +315,8 @@ def teacher_tab_take_attendance():
         records_to_save = []
         for s in enrolled_students:
             sid = s['student_id']
-            is_pres = st.session_state.attendance_state.get(sid, False)
+            chk_key = f"att_check_{sid}_{subject_id}"
+            is_pres = bool(st.session_state.get(chk_key, False))
             records_to_save.append({
                 "student_id": sid,
                 "subject_id": subject_id,
@@ -413,13 +433,14 @@ def teacher_tab_attendance_records():
     for log in logs:
         sid = log.get('student_id')
         if sid in student_stats:
-            if log.get('is_present'):
+            is_pres = log.get('is_present') in (True, 1, 'true', 'True', 't')
+            if is_pres:
                 student_stats[sid]['attended'] += 1
 
     # Overall Attendance Rate
-    total_presents = sum(1 for log in logs if log.get('is_present'))
+    total_presents = sum(1 for log in logs if log.get('is_present') in (True, 1, 'true', 'True', 't'))
     total_expected = len(logs)
-    avg_rate = round((total_presents / total_expected * 100), 1) if total_expected > 0 else 0
+    avg_rate = round((total_presents / total_expected * 100), 1) if total_expected > 0 else 0.0
 
     # Metric Cards
     m1, m2, m3, m4 = st.columns(4)
@@ -442,7 +463,7 @@ def teacher_tab_attendance_records():
         st.subheader("Student-wise Attendance Summary")
         summary_rows = []
         for sid, sinfo in student_stats.items():
-            pct = round((sinfo['attended'] / sinfo['total'] * 100), 1) if sinfo['total'] > 0 else 0
+            pct = round((sinfo['attended'] / sinfo['total'] * 100), 1) if sinfo['total'] > 0 else 0.0
             status = "🟢 Good" if pct >= 75 else ("🟡 Warning" if pct >= 50 else "🔴 Critical")
             summary_rows.append({
                 "Student ID": sid,
@@ -470,8 +491,8 @@ def teacher_tab_attendance_records():
 
         for ts in all_timestamps:
             session_logs = logs_by_session.get(ts, [])
-            pres_students = [l['students']['name'] for l in session_logs if l.get('is_present') and l.get('students')]
-            abs_students = [l['students']['name'] for l in session_logs if not l.get('is_present') and l.get('students')]
+            pres_students = [l['students']['name'] for l in session_logs if l.get('is_present') in (True, 1, 'true', 'True', 't') and l.get('students')]
+            abs_students = [l['students']['name'] for l in session_logs if (not l.get('is_present') or l.get('is_present') in (False, 0, 'false', 'False', 'f')) and l.get('students')]
             
             with st.expander(f"🗓️ Session: **{ts}** — Present: {len(pres_students)} / Total: {len(session_logs)}"):
                 col_p, col_a, col_d = st.columns([3, 3, 2])
@@ -509,7 +530,8 @@ def teacher_tab_attendance_records():
             for ts in all_timestamps:
                 matching_log = next((l for l in logs if l.get('student_id') == sid and l.get('timestamp') == ts), None)
                 if matching_log:
-                    row[ts] = "✅" if matching_log.get('is_present') else "❌"
+                    is_p = matching_log.get('is_present') in (True, 1, 'true', 'True', 't')
+                    row[ts] = "✅" if is_p else "❌"
                 else:
                     row[ts] = "—"
             matrix_data.append(row)
@@ -526,10 +548,11 @@ def teacher_tab_attendance_records():
         df_summary.to_csv(csv_buffer, index=False)
         csv_bytes = csv_buffer.getvalue().encode('utf-8')
         
+        today_ist = get_current_time_ist().date()
         st.download_button(
             label="Download Attendance Summary CSV",
             data=csv_bytes,
-            file_name=f"attendance_{selected_sub['subject_code']}_{datetime.date.today()}.csv",
+            file_name=f"attendance_{selected_sub['subject_code']}_{today_ist}.csv",
             mime="text/csv",
             type="primary",
             icon=":material/download:"

@@ -15,7 +15,7 @@ def create_subject_dialog(teacher_id):
         if sub_id and sub_name and sub_section:
             try:
                 create_subject(sub_id, sub_name, sub_section, teacher_id)
-                st.toast("Subject Creaed Successfully!")
+                st.toast("Subject Created Successfully!")
                 st.rerun()
             except Exception as e:
                 st.error(f"Error:{str(e)}")

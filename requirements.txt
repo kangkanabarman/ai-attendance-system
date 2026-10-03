@@ -1,7 +1,9 @@
 # utilities
 numpy
 pandas
-# Face recognization
+scipy<1.15
+
+# Face recognition
 scikit-learn
 dlib-bin
 

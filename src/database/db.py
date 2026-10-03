@@ -49,13 +49,14 @@ def get_teacher_subject(teacher_id):
     for sub in subjects:
         sub['total_students']=sub.get("subject_students", [{}])[0].get('count', 0) if sub.get('subject_students') else 0
         attendance= sub.get('attendance_logs',[])
-        unique_sessions=len(set(log['timestamp'] for log in attendance))
+        unique_sessions=len(set(log['timestamp'] for log in attendance if 'timestamp' in log))
         sub['total_classes']=unique_sessions
 
-        sub.pop('subject_student',None)
+        sub.pop('subject_students',None)
         sub.pop('attendance_logs',None)
 
     return subjects
+
 def enroll_student_to_subject(student_id,subject_id):
     data={'student_id':student_id, "subject_id":subject_id}
     response=supabase.table('subject_students').insert(data).execute()
@@ -71,4 +72,38 @@ def get_student_subjects(student_id):
 
 def get_student_attendance(student_id):
     response= supabase.table('attendance_logs').select('*,subjects(*)').eq('student_id',student_id).execute()
+    return response.data
+
+def get_subject_enrolled_students(subject_id):
+    """Fetch all students enrolled in a specific subject with their profile details."""
+    response = supabase.table('subject_students').select('student_id, students(*)').eq('subject_id', subject_id).execute()
+    students = []
+    if response.data:
+        for row in response.data:
+            if row.get('students'):
+                students.append(row['students'])
+    return students
+
+def record_attendance_session(records):
+    """Bulk insert attendance logs for a class session."""
+    if not records:
+        return []
+    response = supabase.table('attendance_logs').insert(records).execute()
+    return response.data
+
+def get_subject_attendance_history(subject_id):
+    """Retrieve full attendance logs for a subject with student names."""
+    response = supabase.table('attendance_logs').select('*, students(name, student_id)').eq('subject_id', subject_id).order('timestamp', desc=True).execute()
+    return response.data if response.data else []
+
+def delete_attendance_session(subject_id, timestamp):
+    """Delete an attendance session by subject and timestamp."""
+    response = supabase.table('attendance_logs').delete().eq('subject_id', subject_id).eq('timestamp', timestamp).execute()
+    return response.data
+
+def delete_subject(subject_id):
+    """Delete a subject and its associated enrollments and logs."""
+    supabase.table('attendance_logs').delete().eq('subject_id', subject_id).execute()
+    supabase.table('subject_students').delete().eq('subject_id', subject_id).execute()
+    response = supabase.table('subjects').delete().eq('subject_id', subject_id).execute()
     return response.data

@@ -1,0 +1,5 @@
+cmake
+build-essential
+libgl1
+libsndfile1
+ffmpeg
